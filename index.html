@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>System Metrics</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+  <div id="cpuUsagePlot"></div>
+  <div id="ramUsagePlot"></div>
+  <div id="diskUsagePlot"></div>
+
+  <script>
+  
+    const client = new Paho.MQTT.Client("test.mosquitto.org", 8080, "client-" + new Date().getTime());
+
+    // Define traces for each metric
+    const cpuUsageTrace = {
+ 
+      x: [],
+      y: [],
+      type: 'scatter',
+      mode: 'lines+markers',
+      name: 'CPU Usage',
+      marker: {
+        color: []
+      }
+    };
+
+    const ramUsageTrace = {
+ 
+      x: [],
+      y: [],
+      type: 'scatter',
+      mode: 'lines',
+      name: 'RAM Usage'
+    };
+
+    const diskUsageTrace = {
+      title: 'disk Usage',
+      x: [],
+      y: [],
+      type: 'bar',
+      name: 'Disk Usage',
+      orientation: 'v',
+      marker: {
+      color: []
+  }
+};
+
+
+    const layout = {
+      //title: 'System Metrics',
+      xaxis: {
+        title: 'Time'
+      },
+      yaxis: {
+        title: 'Percentage (%)',
+        range: [0, 100]
+      }
+    };
+
+   
+    Plotly.newPlot('cpuUsagePlot', [cpuUsageTrace], layout);
+    Plotly.newPlot('ramUsagePlot', [ramUsageTrace], layout);
+    Plotly.newPlot('diskUsagePlot', [diskUsageTrace], layout);
+
+  
+    client.connect({
+      onSuccess: function () {
+        console.log('Connected to MQTT broker');
+
+        client.subscribe('cpu-usage');
+        client.subscribe('ram-usage');
+        client.subscribe('disk-usage-percent');
+      },
+      onFailure: function (err) {
+        console.error('Failed to connect to MQTT broker', err);
+      }
+    });
+
+
+    function getRandomColor() {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    // Handle incoming MQTT messages
+    client.onMessageArrived = function (message) {
+
+      const topic = message.destinationName;
+
+      const payload = JSON.parse(message.payloadString);
+
+      console.log(payload);
+
+      // Update the corresponding trace and replot the chart
+      if (topic === 'cpu-usage') {
+        cpuUsageTrace.x.push(new Date());
+        cpuUsageTrace.y.push(payload.cpuUsagePercent);
+        cpuUsageTrace.marker.color.push(getRandomColor());
+        Plotly.redraw('cpuUsagePlot');
+      } else if (topic === 'ram-usage') {
+        ramUsageTrace.x.push(new Date());
+        ramUsageTrace.y.push(payload.ramUsagePercent);
+        Plotly.redraw('ramUsagePlot');
+      } else if (topic === 'disk-usage-percent') {
+        diskUsageTrace.x.push(new Date());
+        diskUsageTrace.y.push(payload.usagePercent);
+        diskUsageTrace.marker.color.push(getRandomColor());
+        Plotly.redraw('diskUsagePlot');
+      }
+};
+</script>
+
+</body>
+</html>
